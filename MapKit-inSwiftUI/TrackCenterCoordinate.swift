@@ -120,8 +120,8 @@ struct MapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         
         mapView.delegate = context.coordinator
-//        mapView.showsUserLocation = true
-//        locationManager
+        mapView.showsUserLocation = true
+        locationManager
         
 //        mapView.mapType = .satellite
 
@@ -147,8 +147,8 @@ struct MapView: UIViewRepresentable {
             if annotations.count >= 2 {
                 let request = MKDirections.Request()
 
-                request.source = MKMapItem(placemark: MKPlacemark(coordinate: annotations[0].coordinate))
-//                request.source = MKMapItem(placemark: MKPlacemark(coordinate: locationManager.location!.coordinate))
+//                request.source = MKMapItem(placemark: MKPlacemark(coordinate: annotations[0].coordinate))
+                request.source = MKMapItem(placemark: MKPlacemark(coordinate: locationManager.location!.coordinate))
                 print(locationManager.location?.coordinate)
                 request.destination = MKMapItem(placemark: MKPlacemark(coordinate: annotations[1].coordinate))
                 request.requestsAlternateRoutes = true
@@ -210,5 +210,3 @@ struct MapView: UIViewRepresentable {
         }
     }
 }
-
-
