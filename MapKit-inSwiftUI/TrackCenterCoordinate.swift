@@ -144,7 +144,7 @@ struct MapView: UIViewRepresentable {
                                 //view.annotations are the old annotations
             view.removeAnnotations(view.annotations)
             view.addAnnotations(annotations)
-            if annotations.count >= 2 {
+            if annotations.count >= 2 && locationManager.location != nil {
                 let request = MKDirections.Request()
 
 //                request.source = MKMapItem(placemark: MKPlacemark(coordinate: annotations[0].coordinate))
