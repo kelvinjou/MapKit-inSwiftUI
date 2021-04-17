@@ -8,6 +8,7 @@
 import SwiftUI
 import MapKit
 import CoreLocation
+import Combine
 
 struct TrackCenterCoordinate: View {
     
@@ -24,8 +25,8 @@ struct TrackCenterCoordinate: View {
     @State private var centerCoordinate = CLLocationCoordinate2D()
     @State private var turnOffOpacity: Bool = false
     @State private var advisoryNotices = [String]()
+    @State private var addressLabel = ""
     
-
     @State private var showAdvisory: Bool = false
     var mapTypes: [String] = ["standard", "hybrid", "satellite"]
     @State private var addLine: Bool = false
@@ -38,7 +39,7 @@ struct TrackCenterCoordinate: View {
     }
     var body: some View {
         let mapView: MapView = {
-            MapView(centerCoordinate: $centerCoordinate, currentSelectedMapType: $currentSelectedMapType, adivsoryNotices: $advisoryNotices, annotation: $location, addLine: addLine)
+            MapView(centerCoordinate: $centerCoordinate, currentSelectedMapType: $currentSelectedMapType, adivsoryNotices: $advisoryNotices, annotation: $location, addressLabel: $addressLabel, addLine: addLine)
         }()
         
         return ZStack {
@@ -72,18 +73,16 @@ struct TrackCenterCoordinate: View {
                     Button(action: {
                         showAdvisory.toggle()
                     }) {
-                        Text("Advisory Notices")
+                        Text("Advisory")
                     }
                     Spacer()
-//                    Button(action: {
-//
-////                        addLine = false
-//                        print(addLine)
-//                    }) {
-//                        Image(systemName: "trash")
-//                    }.disabled(false)
-//                    .buttonStyle(ButtonModifiers(color: Color.red.opacity(0.95)))
-//                    Text("\()")
+                    
+                    RoundedRectangle(cornerRadius: 10)
+                        .foregroundColor(Color.green.opacity(0.7))
+                        .frame(width: 300, height: 30)
+                        .overlay(Text("⚠️ check log for geocode results"))
+                    
+                    Text("\(addressLabel)")
                     Button(action: {
 //                        pin.append(Pin(location: CLLocation(coordinate: centerCoordinate, altitude: 0, horizontalAccuracy: 0, verticalAccuracy: 0, timestamp: Date())))
 //                        print(pin)
@@ -116,12 +115,13 @@ struct TrackCenterCoordinate: View {
 struct MapView: UIViewRepresentable {
     static var defaultRegion = CLLocationCoordinate2D(latitude: 40.71, longitude: -82)
     @ObservedObject var locationManager = LocationManager()
+    
     @Binding var centerCoordinate: CLLocationCoordinate2D
     @Binding var currentSelectedMapType: Int
     @Binding var adivsoryNotices: [String]
 
     @Binding var annotation: MKPointAnnotation
-    
+    @Binding var addressLabel: String
     @State var ETA = TimeInterval()
     
      var addLine: Bool
@@ -139,15 +139,6 @@ struct MapView: UIViewRepresentable {
 
         return mapView
     }
-    
-//    func render(_ location: CLLocation) {
-//        let coordinate = CLLocationCoordinate2D(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
-//        let span = MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
-//
-//        let region = MKCoordinateRegion(center: coordinate, span: span)
-//
-//        mapView.setRegion(region, animated: true)
-//    }
     
     
     func updateUIView(_ view: UIViewType, context: Context) {
@@ -213,75 +204,77 @@ struct MapView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        Coordinator(addressLabel, self)
     }
-    
-}
-class Coordinator: NSObject, MKMapViewDelegate, ObservableObject {
-    @Published var addressLabel: String?
-    var locationManager = LocationManager()
-    var previousLoc: CLLocation?
-    
-    var parent: MapView?
-    
-    
-    init(_ parent: MapView) {
+    class Coordinator: NSObject, MKMapViewDelegate, ObservableObject {
+        @Published var addressLabel: String
+        var locationManager = LocationManager()
+        var previousLoc: CLLocation?
         
-        self.parent = parent
-    }
-    func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
-        //            passed from @Binding in MapView(which is passed from main view)
-        parent!.centerCoordinate = mapView.centerCoordinate
-    }
-    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-        let renderer = MKPolylineRenderer(overlay: overlay)
-        renderer.strokeColor = UIColor(#colorLiteral(red: 0, green: 0.6509803922, blue: 1, alpha: 1))
-        renderer.lineWidth = 5
-        return renderer
-    }
-    
-    func getCenterLocation(for mapView: MKMapView) -> CLLocation {
-        let latitude = mapView.centerCoordinate.latitude
-        let longitude = mapView.centerCoordinate.longitude
+        var parent: MapView?
         
-        return CLLocation(latitude: latitude, longitude: longitude)
-    }
-    
-    
-    
-    //        Geocoding
-    func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-        let center = getCenterLocation(for: mapView)
-        let geoCoder = CLGeocoder()
         
-        locationManager.$initialLocation.sink { (loc) in
-            self.previousLoc = loc!
-            print("previous location: \(self.previousLoc)")
+        init(_ addressLabel: String, _ parent: MapView) {
+            self.addressLabel = addressLabel
+            
+            self.parent = parent
+        }
+        func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+            //            passed from @Binding in MapView(which is passed from main view)
+            parent!.centerCoordinate = mapView.centerCoordinate
+        }
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            let renderer = MKPolylineRenderer(overlay: overlay)
+            renderer.strokeColor = UIColor(#colorLiteral(red: 0, green: 0.6509803922, blue: 1, alpha: 1))
+            renderer.lineWidth = 5
+            return renderer
         }
         
-        guard center.distance(from: previousLoc!) > 50 else { return }
+        func getCenterLocation(for mapView: MKMapView) -> CLLocation {
+            let latitude = mapView.centerCoordinate.latitude
+            let longitude = mapView.centerCoordinate.longitude
+            
+            return CLLocation(latitude: latitude, longitude: longitude)
+        }
         
-        previousLoc = center
         
-        geoCoder.reverseGeocodeLocation(center) { [weak self] (placemarks, error) in
-            guard let self = self else { return }
+        
+        //        Geocoding
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let center = getCenterLocation(for: mapView)
+            let geoCoder = CLGeocoder()
             
-            if let err = error {
-                print("false")
+            locationManager.$initialLocation.sink { (loc) in
+                self.previousLoc = loc!
+                print("previous location: \(String(describing: self.previousLoc))")
             }
-            guard let placemark = placemarks?.first else {
-                return
-            }
             
-            let streetNumber = placemark.subThoroughfare ?? ""
-            let streetName = placemark.thoroughfare ?? ""
+            guard center.distance(from: previousLoc!) > 50 else { return }
             
-            DispatchQueue.main.async {
-                self.addressLabel = String("\(streetNumber) @ \(streetName)")
-                print(self.addressLabel as Any)
+            previousLoc = center
+            
+            geoCoder.reverseGeocodeLocation(center) { [weak self] (placemarks, error) in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print(error.localizedDescription)
+                }
+                guard let placemark = placemarks?.first else {
+                    return
+                }
+                
+                let streetNumber = placemark.subThoroughfare ?? ""
+                let streetName = placemark.thoroughfare ?? ""
+                
+                DispatchQueue.main.async {
+                    self.addressLabel = String("\(streetNumber) @ \(streetName)")
+                    print(self.addressLabel as Any)
+                }
             }
         }
+        
     }
-    
+
 }
+
 
